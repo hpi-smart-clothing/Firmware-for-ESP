@@ -1,7 +1,16 @@
 #include <Wire.h>
+#include <Arduino.h>
 
 #define ATTINY_I2C_ADDR 0x08  // I²C-Adresse des ATtiny85
 #define MAX_BYTES_FOR_I2C 16  // maximale Anzahl an bytes die per I2C in einer Übertragung gesendet werden können
+#define MAX_RESPONSE_TIME 25  // maximale Wartezeit für die Antwort des ATtiny in Millisekunden
+
+String getSerialInput();
+void handleInput(String cmd);
+void handleCharInput(char input);
+void sendCommandToAttiny(uint8_t cmd);
+String requestDataFromAttiny(uint8_t maxLength = MAX_BYTES_FOR_I2C);
+uint8_t request1ByteFromAttiny();
 
 void setup() {
   Serial.begin(115200);
@@ -38,7 +47,7 @@ void handleInput(String cmd) {
   }
 }
 
-String requestDataFromAttiny(uint8_t maxLength = MAX_BYTES_FOR_I2C) {
+String requestDataFromAttiny(uint8_t maxLength) {
   String result = "";
   char c = '\0';
 
@@ -56,10 +65,10 @@ String requestDataFromAttiny(uint8_t maxLength = MAX_BYTES_FOR_I2C) {
 }
 
 void handleCharInput(char input)  {
-  if (input >= '1' && input <= '10') {
+  if (input >= '0' && input <= '10') {
     uint8_t cmd = input - '0';
     sendCommandToAttiny(cmd);
-    delay(10);  // dem ATtiny etwas Zeit geben
+    delay(MAX_RESPONSE_TIME);  // dem ATtiny etwas Zeit geben
     String response = requestDataFromAttiny();
     Serial.print("Antwort vom ATtiny: ");
     Serial.println(response);
