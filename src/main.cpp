@@ -10,6 +10,7 @@ void handleInput(String cmd);
 void handleCharInput(char input);
 void sendCommandToAttiny(uint8_t cmd);
 String requestDataFromAttiny(uint8_t maxLength = MAX_BYTES_FOR_I2C);
+String safeRequestFromAttiny(uint8_t addr = ATTINY_I2C_ADDR, uint8_t len = MAX_BYTES_FOR_I2C);
 uint8_t request1ByteFromAttiny();
 
 void setup() {
@@ -42,8 +43,15 @@ String getSerialInput() {
 
 void handleInput(String cmd) {
   cmd.trim();  // falls z. B. "\r\n" mitkommt
-  if(cmd.length() == 1) {
-    handleCharInput(cmd.charAt(0));
+  int cmdInt = cmd.toInt();
+  if (cmdInt > 0 && cmdInt <= 255) {
+    sendCommandToAttiny((uint8_t)cmdInt);
+    delay(30);
+    String response = safeRequestFromAttiny();
+    Serial.print("Antwort vom ATtiny: ");
+    Serial.println(response);
+  } else {
+    Serial.println("Ungültiger Befehl.");
   }
 }
 
@@ -64,17 +72,27 @@ String requestDataFromAttiny(uint8_t maxLength) {
   return result;
 }
 
-void handleCharInput(char input)  {
-  if (input >= '0' && input <= '10') {
-    uint8_t cmd = input - '0';
-    sendCommandToAttiny(cmd);
-    delay(MAX_RESPONSE_TIME);  // dem ATtiny etwas Zeit geben
-    String response = requestDataFromAttiny();
-    Serial.print("Antwort vom ATtiny: ");
-    Serial.println(response);
-  } else {
-    Serial.println("Unbekannter Befehl.");
+String safeRequestFromAttiny(uint8_t addr, uint8_t len) {
+  String result = "";
+  char c = '\0';
+
+  uint8_t bytesReceived = Wire.requestFrom(addr, len);
+
+  if (!bytesReceived) {
+    return "NO RESPONSE";
   }
+
+  while (Wire.available()) {
+    c = Wire.read();
+    if (c == '\n') break;
+    result += c;
+    delay(1);  // Mini-Wartezeit für ATtiny
+    if (result.length() >= len) {
+      break;  // Maximale Länge erreicht
+    }
+  }
+
+  return result;
 }
 
 uint8_t request1ByteFromAttiny()  {
@@ -89,5 +107,9 @@ uint8_t request1ByteFromAttiny()  {
 void sendCommandToAttiny(uint8_t cmd) {
   Wire.beginTransmission(ATTINY_I2C_ADDR);
   Wire.write(cmd);  // z. B. 1–10
-  Wire.endTransmission();
+  uint8_t status = Wire.endTransmission();
+  if (status != 0) {
+    Serial.print("I2C-Fehler bei EndTransmission: ");
+    Serial.println(status);
+  }
 }
