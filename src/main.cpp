@@ -1,115 +1,163 @@
-#include <Wire.h>
-#include <Arduino.h>
+#include <HardwareSerial.h>
 
-#define ATTINY_I2C_ADDR 0x08  // I²C-Adresse des ATtiny85
-#define MAX_BYTES_FOR_I2C 16  // maximale Anzahl an bytes die per I2C in einer Übertragung gesendet werden können
-#define MAX_RESPONSE_TIME 25  // maximale Wartezeit für die Antwort des ATtiny in Millisekunden
+HardwareSerial Uart1(1);                   // UART1
+#define UARTBAUD 57600
 
-String getSerialInput();
-void handleInput(String cmd);
-void handleCharInput(char input);
-void sendCommandToAttiny(uint8_t cmd);
-String requestDataFromAttiny(uint8_t maxLength = MAX_BYTES_FOR_I2C);
-String safeRequestFromAttiny(uint8_t addr = ATTINY_I2C_ADDR, uint8_t len = MAX_BYTES_FOR_I2C);
-uint8_t request1ByteFromAttiny();
+void sendCmd(char c);
+uint16_t getChar();
+String getTinyLine();
+String readSerialLine();
+void checkForCommand(String input);
+void readSensorPacket();
 
 void setup() {
-  Serial.begin(115200);
-  Wire.begin();  // SDA/SCL default
-  Serial.println("ESP32-C3 bereit. Tippe 1, um vom ATtiny zu lesen.");
+  Serial.begin(115200);                    // USB-Console
+  Uart1.begin(UARTBAUD, SERIAL_8N1, 20, 21); // RX = GPIO20 / D7
 }
 
-void loop() {
-  String temp = getSerialInput();
-  if(temp.length() > 0) {
-    Serial.print("Input: ");
-    Serial.println(temp);
-    handleInput(temp);
+void loop(){
+  String line = readSerialLine();
+  if (line.length() != 0) {
+    long start = millis();
+    checkForCommand(line);
+    long dauer = millis() - start;
+
+    Serial.print("Abfrage-Dauer: ");
+    Serial.print(dauer);
+    Serial.println(" ms");
   }
 }
 
-String getSerialInput() {
-  String inputStr = "";
+void sendCmd(uint8_t addr, char c){
+  while (Uart1.available()) Uart1.read();
+  Uart1.write(addr);
+  Uart1.write(c);
+
+  if(c == 'A' || c == 'B')
+    readSensorPacket();
+  else {
+    String line = Uart1.readStringUntil('\n');
+    Serial.print("String-Antwort: ");
+    Serial.println(line);
+  }
+}
+
+
+
+uint16_t getChar() {
+  if (Serial.available()) {
+    uint16_t c = Serial.read();
+    if (!(c == '\r' || c == '\n')){
+      return c; // erstes nutzbares Zeichen
+    } 
+  }
+  return -1;                                // nichts Neues
+}
+
+String getTinyLine() {
+  Uart1.setTimeout(100);                  // Timeout für die Zeile
+  static String buf;
+  while (Uart1.available()) {
+    char ch = Uart1.read();
+    if (ch == '\n') {                       // Zeile fertig
+      String out = buf;
+      buf = "";
+      return out;
+    }
+    if (ch != '\r') buf += ch;              // CR wegfiltern
+  }
+  return String();                          // noch unvollständig
+}
+
+String readSerialLine() {
+  static String input = "";
   while (Serial.available()) {
     char c = Serial.read();
-    if (c == '\n' || c == '\r') {  // Eingabe abgeschlossen
-      return inputStr;
-    } else {
-      inputStr += c;
+    if (c == '\r') continue;   // CR ignorieren (nur für Windows-Kompatibilität)
+    if (c == '\n') {           // ENTER gedrückt: Zeile fertig!
+      String line = input;
+      input = "";              // Buffer zurücksetzen
+      return line;             // Gibt die komplette Zeile zurück
     }
+    input += c;                // Zeichen an Buffer anhängen
   }
-  return "";
+  return "";                   // Noch keine Zeile fertig
 }
 
-void handleInput(String cmd) {
-  cmd.trim();  // falls z. B. "\r\n" mitkommt
-  int cmdInt = cmd.toInt();
-  if (cmdInt > 0 && cmdInt <= 255) {
-    sendCommandToAttiny((uint8_t)cmdInt);
-    delay(30);
-    String response = safeRequestFromAttiny();
-    Serial.print("Antwort vom ATtiny: ");
-    Serial.println(response);
-  } else {
-    Serial.println("Ungültiger Befehl.");
+void checkForCommand(String input)  {
+  if(input.length() != 3) {
+    Serial.println("No Command detected");
+    return;
   }
+  String addrStr = input.substring(0, 2);
+  uint8_t addr = (uint8_t) strtoul(addrStr.c_str(), NULL, 16);
+  char cmd = input.charAt(2);
+
+  Serial.print("Addr: 0x");
+  Serial.print(addr, HEX);
+  Serial.print(", Command: ");
+  Serial.println(cmd);
+  sendCmd(addr, cmd);
 }
 
-String requestDataFromAttiny(uint8_t maxLength) {
-  String result = "";
-  char c = '\0';
+void readSensorPacket() {
+  const int paketLen = 40;         // Anzahl Bytes im Paket
+  uint8_t paket[paketLen];
 
-  for (int i = 0; i < 32; i++) {
-    Wire.requestFrom(ATTINY_I2C_ADDR, 1);
-    if (Wire.available()) {
-      c = Wire.read();
-      if (c == '\n') break;
-      result += c;
+  // Paket byteweise einlesen
+  for (int i = 0; i < paketLen; i++) {
+    unsigned long start = millis();
+    while (!Uart1.available()) {
+      // Timeout nach 100 ms
+      if (millis() - start > 1000) {
+        Serial.println("UART Timeout beim Paketempfang!");
+        return;
+      }
     }
-    delay(1);  // Mini-Wartezeit für ATtiny
+    paket[i] = Uart1.read();
   }
 
-  return result;
-}
+  int idx = 0;
+  // Acc
+  int16_t accX  = paket[idx++] | (paket[idx++] << 8);
+  int16_t accY  = paket[idx++] | (paket[idx++] << 8);
+  int16_t accZ  = paket[idx++] | (paket[idx++] << 8);
 
-String safeRequestFromAttiny(uint8_t addr, uint8_t len) {
-  String result = "";
-  char c = '\0';
+  // Gyro
+  int16_t gyrX  = paket[idx++] | (paket[idx++] << 8);
+  int16_t gyrY  = paket[idx++] | (paket[idx++] << 8);
+  int16_t gyrZ  = paket[idx++] | (paket[idx++] << 8);
 
-  uint8_t bytesReceived = Wire.requestFrom(addr, len);
+  // Mag
+  int16_t magX  = paket[idx++] | (paket[idx++] << 8);
+  int16_t magY  = paket[idx++] | (paket[idx++] << 8);
+  int16_t magZ  = paket[idx++] | (paket[idx++] << 8);
 
-  if (!bytesReceived) {
-    return "NO RESPONSE";
-  }
+  // Quat
+  int16_t quatW = paket[idx++] | (paket[idx++] << 8);
+  int16_t quatX = paket[idx++] | (paket[idx++] << 8);
+  int16_t quatY = paket[idx++] | (paket[idx++] << 8);
+  int16_t quatZ = paket[idx++] | (paket[idx++] << 8);
 
-  while (Wire.available()) {
-    c = Wire.read();
-    if (c == '\n') break;
-    result += c;
-    delay(1);  // Mini-Wartezeit für ATtiny
-    if (result.length() >= len) {
-      break;  // Maximale Länge erreicht
-    }
-  }
+  // Linear Acceleration
+  int16_t linAccX = paket[idx++] | (paket[idx++] << 8);
+  int16_t linAccY = paket[idx++] | (paket[idx++] << 8);
+  int16_t linAccZ = paket[idx++] | (paket[idx++] << 8);
 
-  return result;
-}
+  // Gravity
+  int16_t gravX = paket[idx++] | (paket[idx++] << 8);
+  int16_t gravY = paket[idx++] | (paket[idx++] << 8);
+  int16_t gravZ = paket[idx++] | (paket[idx++] << 8);
 
-uint8_t request1ByteFromAttiny()  {
-  Wire.requestFrom(ATTINY_I2C_ADDR, 1);
-  if (Wire.available()) {
-    return Wire.read();
-  } else {
-    return 0;
-  }
-}
+  // Reading Time
+  uint16_t readingTime = paket[idx++] | (paket[idx++] << 8);
 
-void sendCommandToAttiny(uint8_t cmd) {
-  Wire.beginTransmission(ATTINY_I2C_ADDR);
-  Wire.write(cmd);  // z. B. 1–10
-  uint8_t status = Wire.endTransmission();
-  if (status != 0) {
-    Serial.print("I2C-Fehler bei EndTransmission: ");
-    Serial.println(status);
-  }
+  // Umrechnen und ausgeben:
+  Serial.printf("Acc:     %.2f, %.2f, %.2f m/s²\n", accX * 0.00981f, accY * 0.00981f, accZ * 0.00981f);
+  Serial.printf("Gyro:    %.2f, %.2f, %.2f °/s\n", gyrX / 16.0f, gyrY / 16.0f, gyrZ / 16.0f);
+  Serial.printf("Mag:     %.2f, %.2f, %.2f uT\n", magX / 16.0f, magY / 16.0f, magZ / 16.0f);
+  Serial.printf("Quat:    %.4f, %.4f, %.4f, %.4f\n", quatW / 16384.0f, quatX / 16384.0f, quatY / 16384.0f, quatZ / 16384.0f);
+  Serial.printf("LinAcc:  %.2f, %.2f, %.2f m/s²\n", linAccX * 0.00981f, linAccY * 0.00981f, linAccZ * 0.00981f);
+  Serial.printf("Gravity: %.2f, %.2f, %.2f m/s²\n", gravX * 0.00981f, gravY * 0.00981f, gravZ * 0.00981f);
+  Serial.printf("Reading Time: %d ms\n", readingTime);
 }
