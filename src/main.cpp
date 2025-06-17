@@ -2,8 +2,22 @@
 
 HardwareSerial Uart1(1);                   // UART1
 #define UARTBAUD 57600
+#define UART_TIMEOUT 10000
+#define UART_PACKET_SIZE 43 // 1 Startbyte + 1 Addr + 40 Data + 1 Endbyte
 
-void sendCmd(char c);
+#define CMD_TEST 0x01
+#define CMD_CHIPID 0x02
+#define CMD_RESTART_BNO 0x03
+#define CMD_CALIBRATION 0x04
+#define CMD_UPDATE_THEN_SEND 0x05
+#define CMD_SEND_THEN_UPDATE 0x06
+#define CMD_UPDATE_DATA 0x07
+#define CMD_SEND_TIME 0x08
+
+#define START_BYTE 0xAA
+#define ENDBYTE 0x55
+
+void sendCmd(uint8_t addr, uint8_t c);
 uint16_t getChar();
 String getTinyLine();
 String readSerialLine();
@@ -28,12 +42,13 @@ void loop(){
   }
 }
 
-void sendCmd(uint8_t addr, char c){
+void sendCmd(uint8_t addr, uint8_t c){
   while (Uart1.available()) Uart1.read();
   Uart1.write(addr);
   Uart1.write(c);
+  delay(50);
 
-  if(c == 'A' || c == 'B')
+  if(c == CMD_UPDATE_THEN_SEND || c == CMD_SEND_THEN_UPDATE)
     readSensorPacket();
   else {
     String line = Uart1.readStringUntil('\n');
@@ -85,31 +100,44 @@ String readSerialLine() {
 }
 
 void checkForCommand(String input)  {
-  if(input.length() != 3) {
-    Serial.println("No Command detected");
+  if (input.length() != 4) {
+    Serial.println("No Command detected (erwarte 4 Stellen, z.B. 0101 für Addr 1, Cmd 1)");
     return;
   }
   String addrStr = input.substring(0, 2);
+  String cmdStr  = input.substring(2, 4);
+
   uint8_t addr = (uint8_t) strtoul(addrStr.c_str(), NULL, 16);
-  char cmd = input.charAt(2);
+  uint8_t cmd  = (uint8_t) strtoul(cmdStr.c_str(),  NULL, 16);
 
   Serial.print("Addr: 0x");
   Serial.print(addr, HEX);
-  Serial.print(", Command: ");
-  Serial.println(cmd);
+  Serial.print(", Command: 0x");
+  Serial.println(cmd, HEX);
+
   sendCmd(addr, cmd);
 }
 
-void readSensorPacket() {
-  const int paketLen = 40;         // Anzahl Bytes im Paket
-  uint8_t paket[paketLen];
 
-  // Paket byteweise einlesen
+void readSensorPacket() {
+  // 1. Auf Startbyte synchronisieren
+  unsigned long startWait = millis();
+
+  while (true) {
+    // Timeout abfragen:
+    if (millis() - startWait > UART_TIMEOUT) {
+      Serial.println("UART Timeout beim Startbyte-Empfang!");
+      return;
+    }
+    if (Uart1.available() && Uart1.read() == START_BYTE) break;
+  }
+
+  const int paketLen = 1 + 40 + 1; // 1 Addr, 40 Daten, 1 End
+  uint8_t paket[UART_PACKET_SIZE - 1]; // -1 for START_BYTE
   for (int i = 0; i < paketLen; i++) {
     unsigned long start = millis();
     while (!Uart1.available()) {
-      // Timeout nach 100 ms
-      if (millis() - start > 1000) {
+      if (millis() - start > UART_TIMEOUT) {
         Serial.println("UART Timeout beim Paketempfang!");
         return;
       }
@@ -118,41 +146,45 @@ void readSensorPacket() {
   }
 
   int idx = 0;
-  // Acc
+  // 3. Adresse lesen
+  uint8_t senderAddr = paket[idx++];
+
+  // 4. Sensordaten wie gehabt auslesen
   int16_t accX  = paket[idx++] | (paket[idx++] << 8);
   int16_t accY  = paket[idx++] | (paket[idx++] << 8);
   int16_t accZ  = paket[idx++] | (paket[idx++] << 8);
 
-  // Gyro
   int16_t gyrX  = paket[idx++] | (paket[idx++] << 8);
   int16_t gyrY  = paket[idx++] | (paket[idx++] << 8);
   int16_t gyrZ  = paket[idx++] | (paket[idx++] << 8);
 
-  // Mag
   int16_t magX  = paket[idx++] | (paket[idx++] << 8);
   int16_t magY  = paket[idx++] | (paket[idx++] << 8);
   int16_t magZ  = paket[idx++] | (paket[idx++] << 8);
 
-  // Quat
   int16_t quatW = paket[idx++] | (paket[idx++] << 8);
   int16_t quatX = paket[idx++] | (paket[idx++] << 8);
   int16_t quatY = paket[idx++] | (paket[idx++] << 8);
   int16_t quatZ = paket[idx++] | (paket[idx++] << 8);
 
-  // Linear Acceleration
   int16_t linAccX = paket[idx++] | (paket[idx++] << 8);
   int16_t linAccY = paket[idx++] | (paket[idx++] << 8);
   int16_t linAccZ = paket[idx++] | (paket[idx++] << 8);
 
-  // Gravity
   int16_t gravX = paket[idx++] | (paket[idx++] << 8);
   int16_t gravY = paket[idx++] | (paket[idx++] << 8);
   int16_t gravZ = paket[idx++] | (paket[idx++] << 8);
 
-  // Reading Time
   uint16_t readingTime = paket[idx++] | (paket[idx++] << 8);
 
-  // Umrechnen und ausgeben:
+  // 5. Endbyte prüfen
+  uint8_t endByte = paket[idx++];
+  if (endByte != ENDBYTE) {
+    Serial.println("Paketende stimmt nicht! Paket wird verworfen.");
+  }
+
+  // 6. Ausgabe (inkl. Absender)
+  Serial.printf("Von Attiny 0x%02X:\n", senderAddr);
   Serial.printf("Acc:     %.2f, %.2f, %.2f m/s²\n", accX * 0.00981f, accY * 0.00981f, accZ * 0.00981f);
   Serial.printf("Gyro:    %.2f, %.2f, %.2f °/s\n", gyrX / 16.0f, gyrY / 16.0f, gyrZ / 16.0f);
   Serial.printf("Mag:     %.2f, %.2f, %.2f uT\n", magX / 16.0f, magY / 16.0f, magZ / 16.0f);
