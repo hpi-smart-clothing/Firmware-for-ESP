@@ -1,9 +1,12 @@
 #include <HardwareSerial.h>
 
-#define DATA_INTERVAL 1000
+#define DATA_INTERVAL 100
 #define UARTBAUD 57600
-#define NUM_ATTINYS 6
-#define ATTINY_PACKET_SIZE 40
+#define NUM_ATTINYS 4
+#define UART_TIMEOUT 100
+#define UART_PACKET_SIZE 43 // 1 Startbyte + 1 Addr + 40 Data + 1 Endbyte
+#define START_BYTE 0xAA
+#define ENDBYTE 0x55
 
 #define CMD_TEST 0x01
 #define CMD_CHIPID 0x02
@@ -14,8 +17,9 @@
 #define CMD_UPDATE_DATA 0x07
 #define CMD_SEND_TIME 0x08
 
-uint8_t attinyAddresses[NUM_ATTINYS] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
+uint8_t attinyAddresses[NUM_ATTINYS] = {0x01, 0x02, 0x03, 0x04};
 uint32_t lastQuery = 0;
+
 
 HardwareSerial Uart1(1);                   // UART1
 
@@ -33,6 +37,7 @@ void setup() {
   delay(10000);
   for(int i = 0; i < NUM_ATTINYS; i++) {
     sendCmd(attinyAddresses[i], CMD_UPDATE_DATA);
+    sendCmd(attinyAddresses[i], CMD_TEST);
     Serial.println("Update Data for Attiny 0x" + String(attinyAddresses[i], HEX));
     delay(5);
   }
@@ -120,10 +125,22 @@ void checkForCommand(String input)  {
 }
 
 void readSensorPacket(uint8_t addr) {
-  uint8_t paket[ATTINY_PACKET_SIZE];
+  // 1. Auf Startbyte synchronisieren
+  unsigned long startWait = millis();
+
+  while (true) {
+    // Timeout abfragen:
+    if (millis() - startWait > UART_TIMEOUT) {
+      Serial.println("UART Timeout beim Startbyte-Empfang!");
+      return;
+    }
+    if (Uart1.available() && Uart1.read() == START_BYTE) break;
+  }
+
+  uint8_t paket[UART_PACKET_SIZE - 1];
 
   // Paket byteweise einlesen
-  for (int i = 0; i < ATTINY_PACKET_SIZE; i++) {
+  for (int i = 0; i < UART_PACKET_SIZE - 1; i++) {
     unsigned long start = millis();
     while (!Uart1.available()) {
       // Timeout nach 100 ms
@@ -136,6 +153,8 @@ void readSensorPacket(uint8_t addr) {
   }
 
   int idx = 0;
+  // 3. Adresse lesen
+  uint8_t senderAddr = paket[idx++];
   // Acc
   int16_t accX  = paket[idx++] | (paket[idx++] << 8);
   int16_t accY  = paket[idx++] | (paket[idx++] << 8);
@@ -169,8 +188,15 @@ void readSensorPacket(uint8_t addr) {
 
   // Reading Time
   uint16_t readingTime = paket[idx++] | (paket[idx++] << 8);
+  
+  // 5. Endbyte prüfen
+  uint8_t endByte = paket[idx++];
+  if (endByte != ENDBYTE) {
+    Serial.println("Paketende stimmt nicht! Paket wird verworfen.");
+  }
 
-  // Umrechnen und ausgeben:
+  // 6. Ausgabe (inkl. Absender)
+  Serial.printf("Von Attiny 0x%02X:\n", senderAddr);
   Serial.printf("Acc:     %.2f, %.2f, %.2f m/s²\n", accX * 0.00981f, accY * 0.00981f, accZ * 0.00981f);
   Serial.printf("Gyro:    %.2f, %.2f, %.2f °/s\n", gyrX / 16.0f, gyrY / 16.0f, gyrZ / 16.0f);
   Serial.printf("Mag:     %.2f, %.2f, %.2f uT\n", magX / 16.0f, magY / 16.0f, magZ / 16.0f);
@@ -187,7 +213,9 @@ void readSensorPacket(uint8_t addr) {
      gravX == 0 && gravY == 0 && gravZ == 0) {
     Serial.println("only zeros received, restarting BNO.");
     sendCmd(addr, CMD_RESTART_BNO);
-    delay(10000);
+    delay(1000);
+    sendCmd(addr, CMD_UPDATE_DATA);
+    delay(10);
     sendCmd(addr, CMD_UPDATE_DATA);
   }
 }
