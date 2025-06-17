@@ -1,16 +1,25 @@
 #include <HardwareSerial.h>
 
-#define DATA_INTERVAL 100
+#define DATA_INTERVAL 1000
 #define UARTBAUD 57600
 #define NUM_ATTINYS 6
 #define ATTINY_PACKET_SIZE 40
+
+#define CMD_TEST 0x01
+#define CMD_CHIPID 0x02
+#define CMD_RESTART_BNO 0x03
+#define CMD_CALIBRATION 0x04
+#define CMD_UPDATE_THEN_SEND 0x05
+#define CMD_SEND_THEN_UPDATE 0x06
+#define CMD_UPDATE_DATA 0x07
+#define CMD_SEND_TIME 0x08
 
 uint8_t attinyAddresses[NUM_ATTINYS] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 uint32_t lastQuery = 0;
 
 HardwareSerial Uart1(1);                   // UART1
 
-void sendCmd(uint8_t addr, char c);
+void sendCmd(uint8_t addr, uint8_t c);
 uint16_t getChar();
 String getTinyLine();
 String readSerialLine();
@@ -21,25 +30,31 @@ void setup() {
   Serial.begin(115200);                    // USB-Console
   Uart1.begin(UARTBAUD, SERIAL_8N1, 20, 21); // RX = GPIO20 / D7
   lastQuery = millis();
+  delay(10000);
+  for(int i = 0; i < NUM_ATTINYS; i++) {
+    sendCmd(attinyAddresses[i], CMD_UPDATE_DATA);
+    Serial.println("Update Data for Attiny 0x" + String(attinyAddresses[i], HEX));
+    delay(5);
+  }
+  while (Uart1.available()) Uart1.read();
   delay(1000);
 }
 
 void loop(){
   uint32_t now = millis();
-
-  // Alle 100 ms (für 10 Hz) einmal durch alle Attinys iterieren:
   if (now - lastQuery >= DATA_INTERVAL) {
     lastQuery += DATA_INTERVAL;
 
     for (int i = 0; i < NUM_ATTINYS; i++) {
-      sendCmd(attinyAddresses[i], 'B');
+      sendCmd(attinyAddresses[i], CMD_UPDATE_THEN_SEND);
       Serial.println("Anfrage an Attiny 0x" + String(attinyAddresses[i], HEX) + " gesendet.");
       readSensorPacket(i);
+      delay(5);
     }
   }
 }
 
-void sendCmd(uint8_t addr, char c){
+void sendCmd(uint8_t addr, uint8_t c){
   while (Uart1.available()) Uart1.read();
   Uart1.write(addr);
   Uart1.write(c);
@@ -154,17 +169,7 @@ void readSensorPacket(uint8_t addr) {
 
   // Reading Time
   uint16_t readingTime = paket[idx++] | (paket[idx++] << 8);
-  // Prüfen, ob das Paket vollständig ist
-  if(quatW == 0 && quatX == 0 && quatY == 0 && quatZ == 0 &&
-     accX == 0 && accY == 0 && accZ == 0 &&
-     gyrX == 0 && gyrY == 0 && gyrZ == 0 &&
-     magX == 0 && magY == 0 && magZ == 0 &&
-     linAccX == 0 && linAccY == 0 && linAccZ == 0 &&
-     gravX == 0 && gravY == 0 && gravZ == 0) {
-    Serial.println("only zeros received, restarting BNO.");
-    sendCmd(addr, 'S');
-    delay(1000);
-  }
+
   // Umrechnen und ausgeben:
   Serial.printf("Acc:     %.2f, %.2f, %.2f m/s²\n", accX * 0.00981f, accY * 0.00981f, accZ * 0.00981f);
   Serial.printf("Gyro:    %.2f, %.2f, %.2f °/s\n", gyrX / 16.0f, gyrY / 16.0f, gyrZ / 16.0f);
@@ -173,4 +178,16 @@ void readSensorPacket(uint8_t addr) {
   Serial.printf("LinAcc:  %.2f, %.2f, %.2f m/s²\n", linAccX * 0.00981f, linAccY * 0.00981f, linAccZ * 0.00981f);
   Serial.printf("Gravity: %.2f, %.2f, %.2f m/s²\n", gravX * 0.00981f, gravY * 0.00981f, gravZ * 0.00981f);
   Serial.printf("Reading Time: %d ms\n", readingTime);
+
+  if(quatW == 0 && quatX == 0 && quatY == 0 && quatZ == 0 &&
+     accX == 0 && accY == 0 && accZ == 0 &&
+     gyrX == 0 && gyrY == 0 && gyrZ == 0 &&
+     magX == 0 && magY == 0 && magZ == 0 &&
+     linAccX == 0 && linAccY == 0 && linAccZ == 0 &&
+     gravX == 0 && gravY == 0 && gravZ == 0) {
+    Serial.println("only zeros received, restarting BNO.");
+    sendCmd(addr, CMD_RESTART_BNO);
+    delay(10000);
+    sendCmd(addr, CMD_UPDATE_DATA);
+  }
 }
