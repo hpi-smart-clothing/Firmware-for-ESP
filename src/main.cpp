@@ -1,8 +1,8 @@
 #include <HardwareSerial.h>
 
-#define DATA_INTERVAL 100
+#define DATA_INTERVAL 1000
 #define UARTBAUD 57600
-#define NUM_ATTINYS 4
+#define NUM_ATTINYS 6
 #define UART_TIMEOUT 100
 #define UART_PACKET_SIZE 43 // 1 Startbyte + 1 Addr + 40 Data + 1 Endbyte
 #define START_BYTE 0xAA
@@ -17,7 +17,7 @@
 #define CMD_UPDATE_DATA 0x07
 #define CMD_SEND_TIME 0x08
 
-uint8_t attinyAddresses[NUM_ATTINYS] = {0x01, 0x02, 0x03, 0x04};
+uint8_t attinyAddresses[NUM_ATTINYS] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 uint32_t lastQuery = 0;
 
 
@@ -49,12 +49,12 @@ void loop(){
   uint32_t now = millis();
   if (now - lastQuery >= DATA_INTERVAL) {
     lastQuery += DATA_INTERVAL;
-
+    while (Uart1.available()) Uart1.read();
     for (int i = 0; i < NUM_ATTINYS; i++) {
       sendCmd(attinyAddresses[i], CMD_UPDATE_THEN_SEND);
       Serial.println("Anfrage an Attiny 0x" + String(attinyAddresses[i], HEX) + " gesendet.");
       readSensorPacket(i);
-      delay(5);
+      delay(20);
     }
   }
 }
