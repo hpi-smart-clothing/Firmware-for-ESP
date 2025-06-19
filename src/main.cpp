@@ -1,7 +1,7 @@
 #include <HardwareSerial.h>
 
 HardwareSerial Uart1(1);                   // UART1
-#define UARTBAUD 57600
+#define UARTBAUD 19200  //57600
 #define UART_TIMEOUT 1000
 #define UART_PACKET_SIZE 43 // 1 Startbyte + 1 Addr + 40 Data + 1 Endbyte
 #define MAX_PACKET_SIZE 64
@@ -51,7 +51,6 @@ void sendCmd(uint8_t addr, uint8_t c){
   while (Uart1.available()) Uart1.read();
   Uart1.write(addr);
   Uart1.write(c);
-  delay(50);
 
   switch(c) {
   case CMD_UPDATE_THEN_SEND:
