@@ -1,7 +1,6 @@
 #include <HardwareSerial.h>
 #include <SPI.h>
 #include <Arduino.h>
-#include <Wire.h>
 #include <array>
 #include <ArduinoJson.h>
 
