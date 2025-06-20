@@ -39,8 +39,9 @@ bool readBNOStatus();
 bool receiveSensorData(uint8_t* dataBuf, uint8_t* dataLen, uint16_t maxLen);
 void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sensorIdx);
 void checkForZeros(const uint8_t* dataBuf, uint8_t dataLen, uint8_t addr);
+void sendZeroSensorJson(uint8_t sensorIdx);
 
-void setup() {
+void setup() {  
   Serial.begin(115200);                    // USB-Console
   Uart1.begin(UARTBAUD, SERIAL_8N1, 20, 21); // RX = GPIO20 / D7
   lastQuery = millis();
@@ -80,6 +81,9 @@ void loop(){
         checkForZeros(buffer, len, attinyAddresses[i]);
         sendSensorPacketAsJson(buffer, len, i);
         Serial.println();
+      } else {
+        Serial.println("Fehler beim Empfangen der Sensordaten von Attiny 0x" + String(attinyAddresses[i], HEX));
+        sendZeroSensorJson(i);
       }
     }
     Serial.println("Dauer alle Attinys abzufragen: " + String(millis() - now) + " ms");
@@ -305,6 +309,18 @@ void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sen
     data.add(quatZ / 16384.0f);
 
     serializeJson(doc, Serial); // oder auf einen anderen Stream/File
+    Serial.println();
+}
+
+void sendZeroSensorJson(uint8_t sensorIdx) {
+    StaticJsonDocument<256> doc;
+    doc["i"] = sensorIdx;
+    JsonArray data = doc.createNestedArray("m");
+
+    // 18 Messwerte (wie in deinem Format): Acc (3), LinAcc (3), Grav (3), Mag (3), Gyro (3), Quat (4)
+    for (int j = 0; j < 18; ++j) data.add(0.0);
+
+    serializeJson(doc, Serial);
     Serial.println();
 }
 
