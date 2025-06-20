@@ -318,7 +318,7 @@ void sendZeroSensorJson(uint8_t sensorIdx) {
     JsonArray data = doc.createNestedArray("m");
 
     // 18 Messwerte (wie in deinem Format): Acc (3), LinAcc (3), Grav (3), Mag (3), Gyro (3), Quat (4)
-    for (int j = 0; j < 18; ++j) data.add(0.0);
+    for (int j = 0; j < 19; ++j) data.add(0.0);
 
     serializeJson(doc, Serial);
     Serial.println();
