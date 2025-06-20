@@ -14,6 +14,8 @@
 #define START_BYTE 0xAA
 #define ENDBYTE 0x55
 #define MAX_PACKET_SIZE 64
+#define TX_PIN 9 // GPIO9 / D9
+#define RX_PIN 10 // GPIO10 / D10
 
 #define CMD_TEST 0x01
 #define CMD_CHIPID 0x02
@@ -43,7 +45,7 @@ void sendZeroSensorJson(uint8_t sensorIdx);
 
 void setup() {  
   Serial.begin(115200);                    // USB-Console
-  Uart1.begin(UARTBAUD, SERIAL_8N1, 20, 21); // RX = GPIO20 / D7
+  Uart1.begin(UARTBAUD, SERIAL_8N1, RX_PIN, TX_PIN); // RX = GPIO20 / D7
   lastQuery = millis();
   StaticJsonDocument<128> doc;
   
