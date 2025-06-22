@@ -3,7 +3,6 @@
 
 #define DATA_INTERVAL 200
 #define UARTBAUD 38400
-#define NUM_ATTINYS 6
 #define UART_TIMEOUT 100
 #define UART_PACKET_SIZE 43
 #define BROADCAST_ADDR 0xFF
@@ -13,6 +12,10 @@
 #define TX_PIN 9 // GPIO9 / D9
 #define RX_PIN 10 // GPIO10 / D10
 
+constexpr uint8_t attinyAddresses[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
+constexpr size_t NUM_ATTINYS = sizeof(attinyAddresses) / sizeof(attinyAddresses[0]);
+
+#define MOTOR_LEFT_PIN D0
 #define CMD_TEST 0x01
 #define CMD_CHIPID 0x02
 #define CMD_RESTART_BNO 0x03
