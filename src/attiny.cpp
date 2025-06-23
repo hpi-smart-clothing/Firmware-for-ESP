@@ -1,6 +1,5 @@
 #include <HardwareSerial.h>
 #include <SPI.h>
-#include <Arduino.h>
 #include <array>
 #include <ArduinoJson.h>
 #include <HardwareSerial.h>
@@ -274,5 +273,22 @@ void checkForZeros(const uint8_t* dataBuf, uint8_t dataLen, uint8_t addr)  {
         Serial.println("BNO konnte nicht gestartet werden: 0x" + String(addr, HEX));
       else
         sendCmd(addr, CMD_UPDATE_DATA);
+    }
+}
+
+void handleSensor(uint8_t sensorIdx) {
+    uint8_t buffer[MAX_PACKET_SIZE];
+    uint8_t len = 0;
+
+    sendCmd(attinyAddresses[sensorIdx], CMD_SEND_THEN_UPDATE);
+    Serial.println("Anfrage an Attiny 0x" + String(attinyAddresses[sensorIdx], HEX) + " gesendet.");
+
+    if (receiveSensorData(buffer, &len, sizeof(buffer))) {
+        checkForZeros(buffer, len, attinyAddresses[sensorIdx]);
+        sendSensorPacketAsJson(buffer, len, sensorIdx);
+        Serial.println();
+    } else {
+        Serial.println("Fehler beim Empfangen der Sensordaten von Attiny 0x" + String(attinyAddresses[sensorIdx], HEX));
+        sendZeroSensorJson(sensorIdx);
     }
 }

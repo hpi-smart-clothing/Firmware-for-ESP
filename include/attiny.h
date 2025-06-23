@@ -1,5 +1,5 @@
-#ifndef IMU_H
-#define IMU_H
+#ifndef ATTINY_H
+#define ATTINY_H
 #include <Arduino.h>
 #include "config.h"
 
@@ -13,5 +13,6 @@ bool receiveSensorData(uint8_t* dataBuf, uint8_t* dataLen, uint16_t maxLen);
 void startAttiny(int idx);
 void sendZeroSensorJson(uint8_t sensorIdx);
 void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sensorIdx);
+void handleSensor(uint8_t sensorIdx);
 
 #endif
