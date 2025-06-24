@@ -284,14 +284,13 @@ void handleAttiny(uint8_t sensorIdx, SensorData& data) {
         Serial.println();
     } else {
         Serial.println("Fehler beim Empfangen der Sensordaten von Attiny 0x" + String(attinyAddresses[sensorIdx], HEX));
-        sendZeroSensorJson(sensorIdx);
     }
 }
 
 void extractQuatsForBLE(const SensorData sensorData[], uint8_t quatData[NUM_ATTINYS][8]) {
   for (int i = 0; i < NUM_ATTINYS; ++i) {
     if (sensorData[i].valid && sensorData[i].dataLen >= 32) {
-      memcpy(quatData[i], &sensorData[i].buffer[24], 8);
+      memcpy(quatData[i], &sensorData[i].buffer[18], 8);
     } else {
       memset(quatData[i], 0, 8);
     }
