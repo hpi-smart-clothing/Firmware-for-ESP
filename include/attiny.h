@@ -2,17 +2,18 @@
 #define ATTINY_H
 #include <Arduino.h>
 #include "config.h"
+#include "DataTypes.h"
+#include "BluetoothManager.h"
 
 extern HardwareSerial Uart1;
 
 void sendCmd(uint8_t addr, uint8_t c);
-void checkForZeros(const uint8_t* dataBuf, uint8_t dataLen, uint8_t addr);
+void checkForZeros(const SensorData& data, uint8_t addr);
 void printSensorUARTPacket();
-bool readBNOStatus();
-bool receiveSensorData(uint8_t* dataBuf, uint8_t* dataLen, uint16_t maxLen);
 void startAttiny(int idx);
 void sendZeroSensorJson(uint8_t sensorIdx);
-void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sensorIdx);
-void handleSensor(uint8_t sensorIdx);
+void sendSensorPacketAsJson(const SensorData& data, uint8_t sensorIdx);
+void handleAttiny(uint8_t sensorIdx, SensorData& data);
+void sendAllQuaternionsBLE(const SensorData sensorData[], BluetoothManager& bleManager);
 
 #endif

@@ -150,82 +150,82 @@ bool readBNOStatus() {
     }
 }
 
-bool receiveSensorData(uint8_t* dataBuf, uint8_t* dataLen, uint16_t maxLen) {
-  if (receiveUARTPacket(nullptr, dataBuf, dataLen, maxLen)) {
-    if (*dataLen < 40) {
-      Serial.println("Sensorpaket zu kurz.");
-      return false;
+bool receiveSensorData(SensorData& data) {
+    data.valid = receiveUARTPacket(nullptr, data.buffer, &data.dataLen, MAX_PACKET_SIZE);
+    if (data.valid && data.dataLen >= 40) {
+        return true;
+    } else {
+        if (!data.valid) 
+          Serial.println("Kein Sensorpaket empfangen.");
+        else             
+          Serial.println("Sensorpaket zu kurz.");
+        data.valid = false;
+        data.dataLen = 0;
+        return false;
     }
-    return true;
-  } else {
-    Serial.println("Kein Sensorpaket empfangen.");
-    return false;
-  }
 }
 
-void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sensorIdx) {
-    if (dataLen < 40) {
+void sendSensorPacketAsJson(const SensorData& data, uint8_t sensorIdx) {
+    if (data.dataLen < 40) {
         Serial.println("Zu kurzes Sensordatenpaket für JSON.");
         return;
     }
 
     int idx = 0;
-    int16_t accX  = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t accY  = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t accZ  = dataBuf[idx++] | (dataBuf[idx++] << 8);
+    int16_t accX  = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t accY  = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t accZ  = data.buffer[idx++] | (data.buffer[idx++] << 8);
 
-    int16_t gyrX  = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t gyrY  = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t gyrZ  = dataBuf[idx++] | (dataBuf[idx++] << 8);
+    int16_t gyrX  = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t gyrY  = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t gyrZ  = data.buffer[idx++] | (data.buffer[idx++] << 8);
 
-    int16_t magX  = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t magY  = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t magZ  = dataBuf[idx++] | (dataBuf[idx++] << 8);
+    int16_t magX  = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t magY  = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t magZ  = data.buffer[idx++] | (data.buffer[idx++] << 8);
 
-    int16_t quatW = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t quatX = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t quatY = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t quatZ = dataBuf[idx++] | (dataBuf[idx++] << 8);
+    int16_t quatW = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t quatX = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t quatY = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t quatZ = data.buffer[idx++] | (data.buffer[idx++] << 8);
 
-    int16_t linAccX = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t linAccY = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t linAccZ = dataBuf[idx++] | (dataBuf[idx++] << 8);
+    int16_t linAccX = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t linAccY = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t linAccZ = data.buffer[idx++] | (data.buffer[idx++] << 8);
 
-    int16_t gravX = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t gravY = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t gravZ = dataBuf[idx++] | (dataBuf[idx++] << 8);
+    int16_t gravX = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t gravY = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t gravZ = data.buffer[idx++] | (data.buffer[idx++] << 8);
 
-    // JSON bauen (wie in deinem anderen Code)
     StaticJsonDocument<256> doc;
-    doc["i"] = sensorIdx; // Sensor-Index, kannst du auch aus Adresse nehmen
-    JsonArray data = doc.createNestedArray("m");
-    // Reihenfolge und Skalierung wie in deinem bisherigen Code:
-    data.add(accX * 0.00981f);
-    data.add(accY * 0.00981f);
-    data.add(accZ * 0.00981f);
+    doc["i"] = sensorIdx;
+    JsonArray arr = doc.createNestedArray("m");
+    arr.add(accX * 0.00981f);
+    arr.add(accY * 0.00981f);
+    arr.add(accZ * 0.00981f);
 
-    data.add(linAccX * 0.00981f);
-    data.add(linAccY * 0.00981f);
-    data.add(linAccZ * 0.00981f);
+    arr.add(linAccX * 0.00981f);
+    arr.add(linAccY * 0.00981f);
+    arr.add(linAccZ * 0.00981f);
 
-    data.add(gravX * 0.00981f);
-    data.add(gravY * 0.00981f);
-    data.add(gravZ * 0.00981f);
+    arr.add(gravX * 0.00981f);
+    arr.add(gravY * 0.00981f);
+    arr.add(gravZ * 0.00981f);
 
-    data.add(magX / 16.0f);
-    data.add(magY / 16.0f);
-    data.add(magZ / 16.0f);
+    arr.add(magX / 16.0f);
+    arr.add(magY / 16.0f);
+    arr.add(magZ / 16.0f);
 
-    data.add(gyrX / 16.0f);
-    data.add(gyrY / 16.0f);
-    data.add(gyrZ / 16.0f);
+    arr.add(gyrX / 16.0f);
+    arr.add(gyrY / 16.0f);
+    arr.add(gyrZ / 16.0f);
 
-    data.add(quatW / 16384.0f);
-    data.add(quatX / 16384.0f);
-    data.add(quatY / 16384.0f);
-    data.add(quatZ / 16384.0f);
+    arr.add(quatW / 16384.0f);
+    arr.add(quatX / 16384.0f);
+    arr.add(quatY / 16384.0f);
+    arr.add(quatZ / 16384.0f);
 
-    serializeJson(doc, Serial); // oder auf einen anderen Stream/File
+    serializeJson(doc, Serial);
     Serial.println();
 }
 
@@ -255,40 +255,51 @@ void startAttiny(int idx) {
     delay(5);
 }
 
-void checkForZeros(const uint8_t* dataBuf, uint8_t dataLen, uint8_t addr)  {
-
-  if (dataLen < 26) return; // 18+8 Bytes nötig!
+void checkForZeros(const SensorData& data, uint8_t addr) {
+    if (data.dataLen < 26) return; // 18+8 Bytes nötig!
 
     int idx = 18; // Offset für Quaternionen
-    int16_t quatW = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t quatX = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t quatY = dataBuf[idx++] | (dataBuf[idx++] << 8);
-    int16_t quatZ = dataBuf[idx++] | (dataBuf[idx++] << 8);
+    int16_t quatW = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t quatX = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t quatY = data.buffer[idx++] | (data.buffer[idx++] << 8);
+    int16_t quatZ = data.buffer[idx++] | (data.buffer[idx++] << 8);
 
     if (quatW == 0 && quatX == 0 && quatY == 0 && quatZ == 0) {
-      Serial.printf("Alle Quaternion-Komponenten sind 0 für Attiny 0x%02X! BNO wird neu gestartet...\n", addr);
-      sendCmd(addr, CMD_RESTART_BNO);
-      delay(1000);
-      if(!readBNOStatus())  
-        Serial.println("BNO konnte nicht gestartet werden: 0x" + String(addr, HEX));
-      else
-        sendCmd(addr, CMD_UPDATE_DATA);
+        Serial.printf("Alle Quaternion-Komponenten sind 0 für Attiny 0x%02X! BNO wird neu gestartet...\n", addr);
+        sendCmd(addr, CMD_RESTART_BNO);
+        delay(1000);
+        if (!readBNOStatus())  
+            Serial.println("BNO konnte nicht gestartet werden: 0x" + String(addr, HEX));
+        else
+            sendCmd(addr, CMD_UPDATE_DATA);
     }
 }
 
-void handleSensor(uint8_t sensorIdx) {
-    uint8_t buffer[MAX_PACKET_SIZE];
-    uint8_t len = 0;
-
+void handleAttiny(uint8_t sensorIdx, SensorData& data) {
     sendCmd(attinyAddresses[sensorIdx], CMD_SEND_THEN_UPDATE);
     Serial.println("Anfrage an Attiny 0x" + String(attinyAddresses[sensorIdx], HEX) + " gesendet.");
 
-    if (receiveSensorData(buffer, &len, sizeof(buffer))) {
-        checkForZeros(buffer, len, attinyAddresses[sensorIdx]);
-        sendSensorPacketAsJson(buffer, len, sensorIdx);
+    if (receiveSensorData(data)) {
+        checkForZeros(data, attinyAddresses[sensorIdx]);
         Serial.println();
     } else {
         Serial.println("Fehler beim Empfangen der Sensordaten von Attiny 0x" + String(attinyAddresses[sensorIdx], HEX));
         sendZeroSensorJson(sensorIdx);
     }
+}
+
+void extractQuatsForBLE(const SensorData sensorData[], uint8_t quatData[NUM_ATTINYS][8]) {
+  for (int i = 0; i < NUM_ATTINYS; ++i) {
+    if (sensorData[i].valid && sensorData[i].dataLen >= 32) {
+      memcpy(quatData[i], &sensorData[i].buffer[24], 8);
+    } else {
+      memset(quatData[i], 0, 8);
+    }
+  }
+}
+
+void sendAllQuaternionsBLE(const SensorData sensorData[], BluetoothManager& bleManager) {
+    uint8_t quatData[NUM_ATTINYS][8];
+    extractQuatsForBLE(sensorData, quatData);
+    bleManager.streamIMUQuats2(quatData);
 }

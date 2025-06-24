@@ -2,12 +2,21 @@
 
 uint32_t lastQuery = 0;
 
+BluetoothManager* bluetoothManager;
+
+void vibrationCallback(size_t size, const VibrationInterval_t *intervals);
+
 void setup() {  
   Serial.begin(115200);
   Uart1.begin(UARTBAUD, SERIAL_8N1, RX_PIN, TX_PIN);
+  bluetoothManager = new BluetoothManager(&vibrationCallback);
+
   delay(1000);
+  
   sendCmd(BROADCAST_ADDR, CMD_RESTART_BNO);
+  
   delay(1000);
+  
   for(int i = 0; i < NUM_ATTINYS; i++) {
     startAttiny(i);
   }
@@ -23,21 +32,24 @@ void loop(){
 
     while (Uart1.available()) Uart1.read();
     
-    for (int i = 0; i < NUM_ATTINYS; i++) {
-      sendCmd(attinyAddresses[i], CMD_SEND_THEN_UPDATE);
-      Serial.println("Anfrage an Attiny 0x" + String(attinyAddresses[i], HEX) + " gesendet.");
-      uint8_t buffer[MAX_PACKET_SIZE];
-      uint8_t len = 0;
+    SensorData sensorData[NUM_ATTINYS];
 
-      if (receiveSensorData(buffer, &len, sizeof(buffer))) {
-        checkForZeros(buffer, len, attinyAddresses[i]);
-        sendSensorPacketAsJson(buffer, len, i);
-        Serial.println();
+    for (int i = 0; i < NUM_ATTINYS; i++) {
+      handleAttiny(i, sensorData[i]);
+    }
+
+    for (int i = 0; i < NUM_ATTINYS; i++) {
+      if (sensorData[i].valid) {
+        sendSensorPacketAsJson(sensorData[i], i);
       } else {
-        Serial.println("Fehler beim Empfangen der Sensordaten von Attiny 0x" + String(attinyAddresses[i], HEX));
         sendZeroSensorJson(i);
       }
     }
+    sendAllQuaternionsBLE(sensorData, *bluetoothManager);
     Serial.println("Dauer alle Attinys abzufragen: " + String(millis() - now) + " ms");
   }
+}
+
+void vibrationCallback(size_t size, const VibrationInterval_t *intervals)  {
+
 }
