@@ -45,7 +45,8 @@ void loop(){
         sendZeroSensorJson(i);
       }
     }
-    sendAllQuaternionsBLE(sensorData, *bluetoothManager);
+    bluetoothManager->streamIMUFullPacket(sensorData);
+
     Serial.println("Dauer alle Attinys abzufragen: " + String(millis() - now) + " ms");
   }
 }

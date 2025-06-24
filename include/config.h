@@ -27,6 +27,8 @@ constexpr size_t NUM_ATTINYS = sizeof(attinyAddresses) / sizeof(attinyAddresses[
 #define CMD_SEND_TIME 0x08
 #define CMD_SEND_BNO_STATUS 0x09
 
+#define MTU_RATE 195
+
 #define MOTOR_LEFT_PIN D0
 #define MOTOR_RIGHT_PIN D1
 #define MOTOR_LEFT_LEDC_CHANNEL 0
