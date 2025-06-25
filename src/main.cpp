@@ -1,14 +1,18 @@
 #include "attiny.h"
+#include "BluetoothManager.h"
+#include "VibrationManager.h"
 
 uint32_t lastQuery = 0;
 
 BluetoothManager* bluetoothManager;
 
+VibrationManager* vibrationManager;
 void vibrationCallback(size_t size, const VibrationInterval_t *intervals);
 
 void setup() {  
   Serial.begin(115200);
   Uart1.begin(UARTBAUD, SERIAL_8N1, RX_PIN, TX_PIN);
+  vibrationManager = new VibrationManager();
   bluetoothManager = new BluetoothManager(&vibrationCallback);
 
   delay(1000);
@@ -51,6 +55,7 @@ void loop(){
   }
 }
 
-void vibrationCallback(size_t size, const VibrationInterval_t *intervals)  {
-
+void vibrationCallback(const size_t size, const VibrationInterval_t* intervals)
+{
+    vibrationManager->submitVibrationPattern(size, intervals);
 }

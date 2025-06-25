@@ -89,27 +89,30 @@ void BluetoothManager::streamIMUFullPacket(const SensorData sensorData[NUM_ATTIN
     uint8_t packet[NUM_ATTINYS * 26]; // 156 Bytes bei 6 Sensoren
 
     for (int i = 0; i < NUM_ATTINYS; ++i) {
+        // Zeiger auf den aktuellen 26-Byte-Bereich für diesen Sensor
+        uint8_t* p = packet + i*26;
+
         if (sensorData[i].valid && sensorData[i].dataLen >= 40) {
-            int idx = 0;
-            // 1. Linear Acceleration (6 Bytes: idx 24–29)
-            memcpy(packet + i*26 + 0,  &sensorData[i].buffer[24], 6);
+            // 1. Linear Acceleration (6 Bytes)
+            sensorData[i].getLinearAccelerationRaw(p + 0);
 
-            // 2. Gravity (6 Bytes: idx 30–35)
-            memcpy(packet + i*26 + 6,  &sensorData[i].buffer[30], 6);
+            // 2. Gravity (6 Bytes)
+            sensorData[i].getGravityRaw(p + 6);
 
-            // 3. Gyro (6 Bytes: idx 6–11)
-            memcpy(packet + i*26 + 12, &sensorData[i].buffer[6], 6);
+            // 3. Gyro (6 Bytes)
+            sensorData[i].getGyroRaw(p + 12);
 
-            // 4. Quaternions (8 Bytes: idx 18–25)
-            memcpy(packet + i*26 + 18, &sensorData[i].buffer[18], 8);
+            // 4. Quaternions (8 Bytes)
+            sensorData[i].getQuaternionsRaw(p + 18);
         } else {
-            memset(packet + i*26, 0, 26); // Leeres Paket bei Fehler
+            memset(p, 0, 26); // Leeres Paket bei Fehler
         }
     }
 
     pIMUCharacteristic->setValue(packet, sizeof(packet));
     pIMUCharacteristic->notify();
 }
+
 
 void BluetoothManager::ServerCallbacks::onConnect(BLEServer* pServer)
 {
