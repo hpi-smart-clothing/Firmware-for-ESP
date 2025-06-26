@@ -1,31 +1,30 @@
-#include "attiny.h"
+#include "AttinyManager.h"
 #include "BluetoothManager.h"
 #include "VibrationManager.h"
+#include "DataManager.h"
 
 uint32_t lastQuery = 0;
+HardwareSerial Uart1(1);
 
 BluetoothManager* bluetoothManager;
-
 VibrationManager* vibrationManager;
+AttinyManager* attinyManager;
+DataManager* dataManager;
+
 void vibrationCallback(size_t size, const VibrationInterval_t *intervals);
 
 void setup() {  
   Serial.begin(115200);
-  Uart1.begin(UARTBAUD, SERIAL_8N1, RX_PIN, TX_PIN);
+  
   vibrationManager = new VibrationManager();
+  dataManager = new DataManager();
   bluetoothManager = new BluetoothManager(&vibrationCallback);
+  attinyManager = new AttinyManager(Uart1);
 
-  delay(1000);
+  attinyManager->begin();
+  delay(50);
+  attinyManager->StartAllAttinys();
   
-  sendCmd(BROADCAST_ADDR, CMD_RESTART_BNO);
-  
-  delay(1000);
-  
-  for(int i = 0; i < NUM_ATTINYS; i++) {
-    startAttiny(i);
-  }
-  sendCmd(BROADCAST_ADDR, CMD_UPDATE_DATA);
-  while (Uart1.available()) Uart1.read();
 }
 
 void loop(){
@@ -33,24 +32,21 @@ void loop(){
 
   if (now - lastQuery >= DATA_INTERVAL) {
     lastQuery += DATA_INTERVAL;
-
-    while (Uart1.available()) Uart1.read();
     
     SensorData sensorData[NUM_ATTINYS];
 
     for (int i = 0; i < NUM_ATTINYS; i++) {
-      handleAttiny(i, sensorData[i]);
+      attinyManager->handleAttiny(i, sensorData[i]);
     }
 
     for (int i = 0; i < NUM_ATTINYS; i++) {
-      if (sensorData[i].valid) {
-        sendSensorPacketAsJson(sensorData[i], i);
+      if (sensorData[i].valid && !(dataManager->checkForZeros(sensorData[i]))) { 
+        dataManager->sendSensorPacketAsJson(sensorData[i], i);
       } else {
-        sendZeroSensorJson(i);
+        dataManager->sendZeroSensorJson(i);
       }
-    }
     bluetoothManager->streamIMUFullPacket(sensorData);
-
+    }
     Serial.println("Dauer alle Attinys abzufragen: " + String(millis() - now) + " ms");
   }
 }
