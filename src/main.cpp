@@ -23,7 +23,7 @@ void setup() {
 
   attinyManager->begin();
   delay(50);
-  attinyManager->StartAllAttinys();
+  attinyManager->startAllAttinys();
   
 }
 
@@ -40,14 +40,19 @@ void loop(){
     }
 
     for (int i = 0; i < NUM_ATTINYS; i++) {
-      if (sensorData[i].valid && !(dataManager->checkForZeros(sensorData[i]))) { 
-        dataManager->sendSensorPacketAsJson(sensorData[i], i);
+      if (sensorData[i].valid) {
+        if(!dataManager->checkForZeros(sensorData[i])) 
+          dataManager->sendSensorPacketAsJson(sensorData[i], i);
+        else {
+          dataManager->sendZeroSensorJson(i);
+          attinyManager->startAttiny(i);
+        }
       } else {
         dataManager->sendZeroSensorJson(i);
       }
-    bluetoothManager->streamIMUFullPacket(sensorData);
     }
-    Serial.println("Dauer alle Attinys abzufragen: " + String(millis() - now) + " ms");
+    bluetoothManager->streamIMUFullPacket(sensorData);
+    Serial.println("Time for all Attinys: " + String(millis() - now) + " ms");
   }
 }
 
