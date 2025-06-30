@@ -41,19 +41,6 @@ BluetoothManager::BluetoothManager(void (*vibrationCallback)(size_t size, const 
 
 void BluetoothManager::streamIMUQuats(uint8_t (*pQuatData)[8]) const
 {
-    // send all quaternions in one packet, 48 bytes, 2 bytes per quat component in fixed point
-    bool newStream = true;
-    uint8_t packet[48];
-    for (int i = 0; i < NUM_ATTINYS; i += 1)
-    {
-        memcpy(packet+i*8, pQuatData[i], 8);
-    }
-    pIMUCharacteristic->setValue(packet, 48);
-    pIMUCharacteristic->notify();
-}
-
-void BluetoothManager::streamIMUQuats2(uint8_t (*pQuatData)[8]) const
-{
     // Transmits 6 quaternions in one 48 byte packet at once
 
     uint8_t quatStream[48];
@@ -83,32 +70,22 @@ void BluetoothManager::handleVibrationData(size_t size, uint8_t* data) const
     delete[] intervals;
 }
 
-// Neue Funktion im BluetoothManager.cpp
 void BluetoothManager::streamIMUFullPacket(const SensorData sensorData[NUM_ATTINYS]) const
 {
-    uint8_t packet[NUM_ATTINYS * 26]; // 156 Bytes bei 6 Sensoren
+    uint8_t packet[NUM_ATTINYS * 26];
 
     for (int i = 0; i < NUM_ATTINYS; ++i) {
-        // Zeiger auf den aktuellen 26-Byte-Bereich für diesen Sensor
-        uint8_t* p = packet + i*26;
+        uint8_t* p = packet + i * 26;
 
         if (sensorData[i].valid && sensorData[i].dataLen >= 40) {
-            // 1. Linear Acceleration (6 Bytes)
             sensorData[i].getLinearAccelerationRaw(p + 0);
-
-            // 2. Gravity (6 Bytes)
             sensorData[i].getGravityRaw(p + 6);
-
-            // 3. Gyro (6 Bytes)
             sensorData[i].getGyroRaw(p + 12);
-
-            // 4. Quaternions (8 Bytes)
             sensorData[i].getQuaternionsRaw(p + 18);
         } else {
-            memset(p, 0, 26); // Leeres Paket bei Fehler
+            memset(p, 0, 26);
         }
     }
-
     pIMUCharacteristic->setValue(packet, sizeof(packet));
     pIMUCharacteristic->notify();
 }

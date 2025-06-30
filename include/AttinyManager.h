@@ -5,12 +5,22 @@
 #include "config.h"
 #include "DataTypes.h"
 
+enum UARTPacketStatus {
+    UART_OK = 0,
+    UART_TIMEOUT_STARTBYTE,
+    UART_TIMEOUT_HEADER,
+    UART_BUFFER_OVERFLOW,
+    UART_TIMEOUT_DATABYTE,
+    UART_TIMEOUT_ENDBYTE,
+    UART_WRONG_ENDBYTE
+};
+
 class AttinyManager {
 public:
     AttinyManager(HardwareSerial& uart);
 
     void begin();
-    bool AttinyManager::startAttiny(uint8_t idx);
+    bool startAttiny(uint8_t idx);
     bool receiveSensorData(uint8_t idx, SensorData& data);
     void handleAttiny(uint8_t idx, SensorData& data);
     void startAllAttinys();
@@ -23,16 +33,6 @@ private:
     bool readBNOStatus(uint8_t idx);
     void sendCmd(uint8_t addr, uint8_t cmd);
 
-};
-
-enum UARTPacketStatus {
-    UART_OK = 0,
-    UART_TIMEOUT_STARTBYTE,
-    UART_TIMEOUT_HEADER,
-    UART_BUFFER_OVERFLOW,
-    UART_TIMEOUT_DATABYTE,
-    UART_TIMEOUT_ENDBYTE,
-    UART_WRONG_ENDBYTE
 };
 
 #endif // ATTINYMANAGER_H

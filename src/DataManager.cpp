@@ -3,14 +3,13 @@
 
 void DataManager::SerialPrintRawUARTPacket(const uint8_t* dataBuf, uint8_t dataLen, uint8_t senderAddr) const {
     Serial.printf("Raw Data from 0x%02X, %d Bytes:\n", senderAddr, dataLen);
-    for (int i = 0; i < dataLen; i++) {
+    for (int i = 0; i < dataLen; i++)
         Serial.printf("Byte %2d: 0x%02X\n", i, dataBuf[i]);
-    }
 }
 
 void DataManager::SerialPrintSensorUARTPacket(const SensorData& data, uint8_t senderAddr) const {
     if (data.dataLen < 40) {
-        Serial.println("Sensor packet to short.");
+        Serial.println("Sensor packet too short.");
         return;
     }
     uint8_t accRaw[6], gyroRaw[6], magRaw[6], quatRaw[8], linAccRaw[6], gravRaw[6];
@@ -36,7 +35,7 @@ void DataManager::SerialPrintSensorUARTPacket(const SensorData& data, uint8_t se
 
 void DataManager::sendSensorPacketAsJson(const SensorData& data, uint8_t sensorIdx) const {
     if (data.dataLen < 40) {
-        Serial.println("Sensor packet to short.");
+        Serial.println("Sensor packet too short.");
         return;
     }
     uint8_t accRaw[6], gyroRaw[6], magRaw[6], quatRaw[8], linAccRaw[6], gravRaw[6];
