@@ -1,4 +1,4 @@
-# Firmware Data Structure
+# Firmware for ESP
 
 This firmware collects data form multiple Attinys via UART. Each Attiny collects the orrientation data from a BNO055 IMU Sensor. It sends them as JSON via serial and provides a BLE server with a subscription to get some of the orientation data. It also provides a service to controll 2 vibration motors via BLE.
 
