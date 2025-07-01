@@ -35,7 +35,7 @@ For IMU #1, bytes `0…25`; for IMU #2, bytes `26…51`; and so on.
 | 18     | 18–19  | Quaternion W     | int16_t   | `raw / 16384.0f` → unit quaternion component |
 | 20     | 20–21  | Quaternion X     | int16_t   | `raw / 16384.0f` → unit quaternion component |
 | 22     | 22–23  | Quaternion Y     | int16_t   | `raw / 16384.0f` → unit quaternion component |
-
+| 24     | 24–25  | Quaternion Z     | int16_t   | `raw / 16384.0f` → unit quaternion component |
 ## Vibration Command Format
 
 The BLE interface for haptic feedback accepts a stream of 4-byte intervals:
@@ -49,12 +49,9 @@ You may concatenate multiple intervals back-to-back in a single packet or send t
 ### Example
 
 To alternate both motors at full intensity for 1 s each, send the following 8-byte packet:
-**03 E8 FF 00 03 E8 00 FF**
+`03 E8 FF 00 03 E8 00 FF´
 
 - `03 E8` → 1000 ms  
 - `FF 00` → left=255, right=0  
 - `03 E8` → 1000 ms  
 - `00 FF` → left=0,   right=255  
-
-
-| 24     | 24–25  | Quaternion Z     | int16_t   | `raw / 16384.0f` → unit quaternion component |
