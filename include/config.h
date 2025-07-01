@@ -31,8 +31,8 @@ constexpr size_t NUM_ATTINYS = sizeof(attinyAddresses) / sizeof(attinyAddresses[
 
 #define MTU_RATE 195
 
-#define MOTOR_LEFT_PIN D0
-#define MOTOR_RIGHT_PIN D1
+#define MOTOR_LEFT_PIN D8
+#define MOTOR_RIGHT_PIN D7
 #define MOTOR_LEFT_LEDC_CHANNEL 0
 #define MOTOR_RIGHT_LEDC_CHANNEL 0
 #define MOTOR_PWM_FREQUENCY 5000 
