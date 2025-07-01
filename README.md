@@ -49,7 +49,8 @@ You may concatenate multiple intervals back-to-back in a single packet or send t
 ### Example
 
 To alternate both motors at full intensity for 1 s each, send the following 8-byte packet:
-`03 E8 FF 00 03 E8 00 FF´
+
+`03 E8 FF 00 03 E8 00 FF`
 
 - `03 E8` → 1000 ms  
 - `FF 00` → left=255, right=0  
