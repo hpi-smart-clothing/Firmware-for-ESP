@@ -35,7 +35,7 @@ constexpr size_t NUM_ATTINYS = sizeof(attinyAddresses) / sizeof(attinyAddresses[
 #define MOTOR_RIGHT_PIN D7
 #define MOTOR_LEFT_LEDC_CHANNEL 0
 #define MOTOR_RIGHT_LEDC_CHANNEL 0
-#define MOTOR_PWM_FREQUENCY 5000 
+#define MOTOR_PWM_FREQUENCY 5000
 
 #define BLE_DEVICE_NAME "BackUp"
 
