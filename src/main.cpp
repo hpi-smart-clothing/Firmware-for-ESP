@@ -29,6 +29,7 @@
 
 uint8_t attinyAddresses[NUM_ATTINYS] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 uint32_t lastQuery = 0;
+uint32_t packetGroupId = 0; // Gruppennummer für die Loop-Pakete
 
 
 HardwareSerial Uart1(1);                   // UART1
@@ -39,9 +40,9 @@ void printRawUARTPacket();
 void printSensorUARTPacket();
 bool readBNOStatus();
 bool receiveSensorData(uint8_t* dataBuf, uint8_t* dataLen, uint16_t maxLen);
-void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sensorIdx);
+void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sensorIdx, uint32_t groupId);
 void checkForZeros(const uint8_t* dataBuf, uint8_t dataLen, uint8_t addr);
-void sendZeroSensorJson(uint8_t sensorIdx);
+void sendZeroSensorJson(uint8_t sensorIdx, uint32_t groupId);
 
 void setup() {  
   Serial.begin(115200);                    // USB-Console
@@ -72,23 +73,24 @@ void loop(){
   uint32_t now = millis();
   if (now - lastQuery >= DATA_INTERVAL) {
     lastQuery += DATA_INTERVAL;
+    packetGroupId++; // Gruppennummer erhöhen
     while (Uart1.available()) Uart1.read();
     for (int i = 0; i < NUM_ATTINYS; i++) {
       sendCmd(attinyAddresses[i], CMD_SEND_THEN_UPDATE);
-      Serial.println("Anfrage an Attiny 0x" + String(attinyAddresses[i], HEX) + " gesendet.");
+      //Serial.println("Anfrage an Attiny 0x" + String(attinyAddresses[i], HEX) + " gesendet.");
       uint8_t buffer[MAX_PACKET_SIZE];
       uint8_t len = 0;
 
       if (receiveSensorData(buffer, &len, sizeof(buffer))) {
         checkForZeros(buffer, len, attinyAddresses[i]);
-        sendSensorPacketAsJson(buffer, len, i);
-        Serial.println();
+        sendSensorPacketAsJson(buffer, len, i, packetGroupId); // Gruppennummer übergeben
+        //Serial.println();
       } else {
-        Serial.println("Fehler beim Empfangen der Sensordaten von Attiny 0x" + String(attinyAddresses[i], HEX));
-        sendZeroSensorJson(i);
+        //Serial.println("Fehler beim Empfangen der Sensordaten von Attiny 0x" + String(attinyAddresses[i], HEX));
+        sendZeroSensorJson(i, packetGroupId); // Gruppennummer übergeben
       }
     }
-    Serial.println("Dauer alle Attinys abzufragen: " + String(millis() - now) + " ms");
+    //Serial.println("Dauer alle Attinys abzufragen: " + String(millis() - now) + " ms");
   }
 }
 
@@ -248,7 +250,8 @@ bool receiveSensorData(uint8_t* dataBuf, uint8_t* dataLen, uint16_t maxLen) {
   }
 }
 
-void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sensorIdx) {
+// Signatur anpassen
+void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sensorIdx, uint32_t groupId) {
     if (dataLen < 40) {
         Serial.println("Zu kurzes Sensordatenpaket für JSON.");
         return;
@@ -280,11 +283,11 @@ void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sen
     int16_t gravY = dataBuf[idx++] | (dataBuf[idx++] << 8);
     int16_t gravZ = dataBuf[idx++] | (dataBuf[idx++] << 8);
 
-    // JSON bauen (wie in deinem anderen Code)
     StaticJsonDocument<256> doc;
-    doc["i"] = sensorIdx; // Sensor-Index, kannst du auch aus Adresse nehmen
+    doc["i"] = sensorIdx;
+    doc["t"] = millis();      // Timestamp
+    doc["g"] = groupId;       // Gruppennummer
     JsonArray data = doc.createNestedArray("m");
-    // Reihenfolge und Skalierung wie in deinem bisherigen Code:
     data.add(accX * 0.00981f);
     data.add(accY * 0.00981f);
     data.add(accZ * 0.00981f);
@@ -310,16 +313,18 @@ void sendSensorPacketAsJson(const uint8_t* dataBuf, uint8_t dataLen, uint8_t sen
     data.add(quatY / 16384.0f);
     data.add(quatZ / 16384.0f);
 
-    serializeJson(doc, Serial); // oder auf einen anderen Stream/File
+    serializeJson(doc, Serial);
     Serial.println();
 }
 
-void sendZeroSensorJson(uint8_t sensorIdx) {
+// Signatur anpassen
+void sendZeroSensorJson(uint8_t sensorIdx, uint32_t groupId) {
     StaticJsonDocument<256> doc;
     doc["i"] = sensorIdx;
+    doc["t"] = millis();   // Timestamp
+    doc["g"] = groupId;    // Gruppennummer
     JsonArray data = doc.createNestedArray("m");
 
-    // 18 Messwerte (wie in deinem Format): Acc (3), LinAcc (3), Grav (3), Mag (3), Gyro (3), Quat (4)
     for (int j = 0; j < 19; ++j) data.add(0.0);
 
     serializeJson(doc, Serial);
@@ -336,11 +341,12 @@ void checkForZeros(const uint8_t* dataBuf, uint8_t dataLen, uint8_t addr)  {
     int16_t quatZ = dataBuf[idx++] | (dataBuf[idx++] << 8);
 
     if (quatW == 0 && quatX == 0 && quatY == 0 && quatZ == 0) {
-      Serial.printf("Alle Quaternion-Komponenten sind 0 für Attiny 0x%02X! BNO wird neu gestartet...\n", addr);
+      //Serial.printf("Alle Quaternion-Komponenten sind 0 für Attiny 0x%02X! BNO wird neu gestartet...\n", addr);
       sendCmd(addr, CMD_RESTART_BNO);
       delay(1000);
       if(!readBNOStatus())  
-        Serial.println("BNO konnte nicht gestartet werden: 0x" + String(addr, HEX));
+        //Serial.println("BNO konnte nicht gestartet werden: 0x" + String(addr, HEX));
+        delay(0);
       else
         sendCmd(addr, CMD_UPDATE_DATA);
     }
