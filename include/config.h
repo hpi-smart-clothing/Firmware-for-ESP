@@ -11,8 +11,8 @@
 #define START_BYTE 0xAA
 #define ENDBYTE 0x55
 #define MAX_PACKET_SIZE 64
-#define TX_PIN 9 // GPIO9 / D9
-#define RX_PIN 10 // GPIO10 / D10
+#define TX_PIN D9 // GPIO9 / D9
+#define RX_PIN D10 // GPIO10 / D10
 
 constexpr uint8_t attinyAddresses[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 constexpr size_t NUM_ATTINYS = sizeof(attinyAddresses) / sizeof(attinyAddresses[0]);
@@ -31,10 +31,10 @@ constexpr size_t NUM_ATTINYS = sizeof(attinyAddresses) / sizeof(attinyAddresses[
 
 #define MTU_RATE 195
 
-#define MOTOR_LEFT_PIN D8
-#define MOTOR_RIGHT_PIN D7
+#define MOTOR_LEFT_PIN D7
+#define MOTOR_RIGHT_PIN D8
 #define MOTOR_LEFT_LEDC_CHANNEL 0
-#define MOTOR_RIGHT_LEDC_CHANNEL 0
+#define MOTOR_RIGHT_LEDC_CHANNEL 1
 #define MOTOR_PWM_FREQUENCY 5000
 
 #define BLE_DEVICE_NAME "BackUp"

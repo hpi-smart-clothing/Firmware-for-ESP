@@ -1,33 +1,35 @@
-#include "AttinyManager.h"
+//#include "AttinyManager.h"
 #include "BluetoothManager.h"
 #include "VibrationManager.h"
-#include "DataManager.h"
+//#include "DataManager.h"
 
 uint32_t lastQuery = 0;
-HardwareSerial Uart1(1);
+//HardwareSerial Uart1(1);
 
 BluetoothManager* bluetoothManager;
 VibrationManager* vibrationManager;
-AttinyManager* attinyManager;
-DataManager* dataManager;
+//AttinyManager* attinyManager;
+//DataManager* dataManager;
 
 void vibrationCallback(size_t size, const VibrationInterval_t *intervals);
 
 void setup() {  
   Serial.begin(115200);
   
-  vibrationManager = new VibrationManager();
-  dataManager = new DataManager();
-  bluetoothManager = new BluetoothManager(&vibrationCallback);
-  attinyManager = new AttinyManager(Uart1);
+  pinMode(7, OUTPUT);   // D7 als Ausgang
+  pinMode(8, OUTPUT);   // D8 als Ausgang
 
-  attinyManager->begin();
-  delay(50);
-  attinyManager->startAllAttinys();
-  
+  digitalWrite(7, LOW);
+  digitalWrite(8, LOW);
+
+  vibrationManager = new VibrationManager();
+  bluetoothManager = new BluetoothManager(&vibrationCallback);
+
+  delay(50);  
 }
 
 void loop(){
+  /*
   uint32_t now = millis();
 
   if (now - lastQuery >= DATA_INTERVAL) {
@@ -54,6 +56,7 @@ void loop(){
     bluetoothManager->streamIMUFullPacket(sensorData);
     Serial.println("Time for all Attinys: " + String(millis() - now) + " ms");
   }
+  */
 }
 
 void vibrationCallback(const size_t size, const VibrationInterval_t* intervals)
